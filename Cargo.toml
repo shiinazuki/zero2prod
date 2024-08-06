@@ -3,9 +3,26 @@ name = "zero2prod"
 version = "0.1.0"
 edition = "2021"
 
+
+[lib]
+path = "src/lib.rs"
+
+# 注意双方括号：它是 TOML 语法中的数组。
+# 一个项目中只能有一个库，但我们可以有多个二进制文件！
+# 如果您想管理同一仓库中的多个库 # 看看工作区功能 - 我们稍后会介绍。
+[[bin]]
+path = "src/main.rs"
+name = "zero2prod"
+
 [dependencies]
+actix-web = "4.8.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"]}
 
 
+# 开发依赖项专门用于运行测试或示例
+# 它们不会包含在最终的应用程序二进制文件中！
+[dev-dependencies]
+reqwest = "0.11"
 
 [target.x86_64-pc-windows-msvc]
 rustflags = ["-C", "link-arg=-fuse-ld=lld"]
