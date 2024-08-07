@@ -1,7 +1,0 @@
-application_port: 8000
-database:
-  host: "74.211.109.216"
-  port: 40835
-  username: "shiina"
-  password: "%40%23^%23%40%2A%25%40%28shiina"
-  database_name: "newsletter"
