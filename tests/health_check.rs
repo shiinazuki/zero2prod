@@ -1,6 +1,8 @@
 //! tests/health_check.rs
 
 use std::net::TcpListener;
+use sqlx::{Connection, PgConnection, PgPool};
+use zero2prod::configuration::get_configuration;
 
 // `tokio::test` 是 `tokio::main` 的测试等价物。
 // 它还使您不必指定 `#[test]` 属性。
@@ -10,14 +12,14 @@ use std::net::TcpListener;
 #[tokio::test]
 async fn health_check_works() {
     // 安排
-    let address = spawn_app();
+    let address = spawn_app().await;
 
     let client = reqwest::Client::new();
 
     // Act
     let response = client
         // 使用返回的应用程序地址
-        .get(&format!("{}/health_check", &address))
+        .get(&format!("{}/health_check", &address.address))
         .send()
         .await
         .expect("Failed to execute request.");
@@ -27,25 +29,101 @@ async fn health_check_works() {
     assert_eq!(Some(0), response.content_length());
 }
 
-// 以某种方式在后台启动我们的应用程序
+pub struct TestApp {
+    pub address: String,
+    pub db_pool: PgPool,
+}
 
-// 没有 .await 调用，因此现在不需要 `spawn_app` 异步。
-// 我们也正在运行测试，因此传播错误是不值得的：
-// 如果我们无法执行所需的设置，我们就会惊慌失措并崩溃
-// 所有的事情
-fn spawn_app() -> String {
+// 以某种方式在后台启动我们的应用程序
+async fn spawn_app() -> TestApp {
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
 
     // 我们检索操作系统分配给我们的端口
     let port = listener.local_addr().unwrap().port();
-    let server = zero2prod::run(listener).expect("Failed to bind address");
-    // 将服务器作为后台任务启动
-    // tokio::spawn 返回生成的未来的句柄，
-    // 但这里我们用不着它，因此非绑定 let
+
+    let address = format!("http://127.0.0.1:{}", port);
+
+    let configuration = get_configuration().expect("Failed to read configuration.");
+    let connection_pool = PgPool::connect(&configuration.database.connection_string())
+        .await
+        .expect("Failed to connect to Postgres.");
+
+    let server = zero2prod::startup::run(listener, connection_pool.clone()).expect("Failed to bind address");
+
+
     let _ = tokio::spawn(server);
 
-    // 我们将应用程序地址返回给调用者！
-    format!("http://127.0.0.1:{}", port)
-
+    TestApp {
+        address,
+        db_pool: connection_pool,
+    }
 }
 
+#[tokio::test]
+async fn subscribe_returns_a_200_for_valid_form_data() {
+    // Arrange
+    let app_address = spawn_app().await;
+
+    let configuration = get_configuration().expect("Failed to read configuration");
+    let connection_string = configuration.database.connection_string();
+    // `Connection` 特征必须在我们调用的范围内
+    // `PgConnection::connect` - 它不是结构的固有方法！
+    let mut connection = PgConnection::connect(&connection_string)
+        .await
+        .expect("Failed to connect to Postgres.");
+
+    let client = reqwest::Client::new();
+
+    // Act
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let response = client
+        .post(&format!("{}/subscriptions", &app_address.address))
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()
+        .await
+        .expect("Failed to execute request..");
+
+    // Assert
+    assert_eq!(200, response.status().as_u16());
+
+    let saved = sqlx::query!("SELECT email, name FROM subscriptions",)
+        .fetch_one(&mut connection)
+        .await
+        .expect("Failed to fetch saved subscription.");
+
+    assert_eq!(saved.email, "ursula_le_guin@gmail.com");
+    assert_eq!(saved.name, "le guin");
+}
+
+#[tokio::test]
+async fn subscribe_returns_a_400_when_data_is_missing() {
+    // Arrange
+    let app_address = spawn_app().await;
+    let client = reqwest::Client::new();
+    let test_cases = vec![
+        ("name=le%20guin", "missing the email"),
+        ("email=ursula_le_guin%40@gmail.com", "missing the name"),
+        ("", "missing both name and email"),
+    ];
+
+    for (invalid_body, error_message) in test_cases {
+        // Act
+        let response = client
+            .post(&format!("{}/subscriptions", &app_address.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(invalid_body)
+            .send()
+            .await
+            .expect("Failed to execute request..");
+
+        // Assert
+        assert_eq!(
+            400,
+            response.status().as_u16(),
+            // 测试失败时附加自定义错误消息
+            "The API did not fail with 400 Bad Request when the payload was {}.",
+            error_message
+        );
+    }
+}

@@ -16,13 +16,30 @@ name = "zero2prod"
 
 [dependencies]
 actix-web = "4.8.0"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"]}
+tokio = { version = "1.39.2", features = ["macros", "rt-multi-thread"] }
+serde = { version = "1.0.204", features = ["derive"] }
+config = "0.11.0"
+uuid = { version = "1.10.0", features = ["v4"] }
+chrono = "0.4.38"
 
+[dependencies.sqlx]
+version = "0.8.0"
+default-features = false
+features = [
+    "runtime-tokio-native-tls",
+    "macros",
+    "postgres",
+    "uuid",
+    "chrono",
+    "migrate",
+]
 
 # 开发依赖项专门用于运行测试或示例
 # 它们不会包含在最终的应用程序二进制文件中！
 [dev-dependencies]
-reqwest = "0.11"
+reqwest = "0.12.5"
 
-[target.x86_64-pc-windows-msvc]
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+
+#[target.x86_64-pc-windows-msvc]
+#rustflags = ["-C", "link-arg=-fuse-ld=lld"]
