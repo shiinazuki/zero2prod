@@ -1,19 +1,22 @@
-use std::net::TcpListener;
 use sqlx::PgPool;
+use std::net::TcpListener;
+use secrecy::ExposeSecret;
 use zero2prod::configuration::get_configuration;
 use zero2prod::startup;
+use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 const HOST_ADDRESS: &str = "127.0.0.1";
 
-
 #[tokio::main]
-async fn main() -> Result<(), std::io::Error> {
+async fn main() -> std::io::Result<()> {
+    let subscriber = get_subscriber("zero2prod".into(), "info".into(), std::io::stdout);
+    init_subscriber(subscriber);
 
     // 如果不能读取配置  panic
     let configuration = get_configuration().expect("Failed to read configuration.");
 
     // 拿到pgsql的连接
-    let connection_pool = PgPool::connect(&configuration.database.connection_string())
+    let connection_pool = PgPool::connect(&configuration.database.connection_string().expose_secret())
         .await
         .expect("Failed to connect to Postgres.");
 
@@ -21,5 +24,6 @@ async fn main() -> Result<(), std::io::Error> {
     let address = format!("{}:{}", HOST_ADDRESS, configuration.application_port);
 
     let listen = TcpListener::bind(address)?;
-    startup::run(listen, connection_pool)?.await
+    startup::run(listen, connection_pool)?.await?;
+    Ok(())
 }
