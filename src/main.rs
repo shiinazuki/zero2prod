@@ -1,11 +1,9 @@
+use secrecy::ExposeSecret;
 use sqlx::PgPool;
 use std::net::TcpListener;
-use secrecy::ExposeSecret;
 use zero2prod::configuration::get_configuration;
 use zero2prod::startup;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
-
-const HOST_ADDRESS: &str = "127.0.0.1";
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -16,12 +14,16 @@ async fn main() -> std::io::Result<()> {
     let configuration = get_configuration().expect("Failed to read configuration.");
 
     // 拿到pgsql的连接
-    let connection_pool = PgPool::connect(&configuration.database.connection_string().expose_secret())
-        .await
-        .expect("Failed to connect to Postgres.");
+    let connection_pool =
+        PgPool::connect(&configuration.database.connection_string().expose_secret())
+            .await
+            .expect("Failed to connect to Postgres.");
 
     // 我们已经删除了硬编码的“8000”——它现在来自我们的设置！
-    let address = format!("{}:{}", HOST_ADDRESS, configuration.application_port);
+    let address = format!(
+        "{}:{}",
+        configuration.application.host, configuration.application.port
+    );
 
     let listen = TcpListener::bind(address)?;
     startup::run(listen, connection_pool)?.await?;
