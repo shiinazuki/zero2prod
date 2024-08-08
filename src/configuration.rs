@@ -1,4 +1,3 @@
-use actix_web::App;
 use secrecy::{ExposeSecret, Secret};
 
 #[derive(serde::Deserialize)]
