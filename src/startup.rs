@@ -1,7 +1,7 @@
 use actix_web::dev::Server;
 use actix_web::{web, App, HttpServer};
 use std::net::TcpListener;
-use sqlx::{PgPool};
+use sqlx::PgPool;
 use crate::route::*;
 
 // 注意不同的签名！
@@ -20,8 +20,8 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Er
             // 将连接注册为应用程序状态的一部分
             .app_data(connection.clone())
     })
-    .listen(listener)?
-    .run();
+        .listen(listener)?
+        .run();
 
     // No .await here!
     Ok(server)
