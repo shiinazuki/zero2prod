@@ -20,16 +20,22 @@ touch local.yaml
 
 application:
   host: 127.0.0.1
+database:
+  require_ssl: false
   
 touch dev.yaml
 
 application:
   host: 127.0.0.1
+database:
+  require_ssl: false
   
 touch production.yaml
 
 application:
   host: 0.0.0.0
+database:
+  require_ssl: true
   
 ```
 
