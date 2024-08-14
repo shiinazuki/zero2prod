@@ -15,6 +15,11 @@ database:
   username: your username
   password: your pass
   database_name: your db name
+email_client:
+  base_url: "127.0.0.1"
+  sender_email: "test@gmail.com"
+  authorization_token: "my-secret-token"
+  timeout_milliseconds: 10000
 
 touch local.yaml
 
@@ -36,6 +41,11 @@ application:
   host: 0.0.0.0
 database:
   require_ssl: true
+email_client:
+# Value retrieved from Postmark's API documentation
+  base_url: "https://api.postmarkapp.com"
+# Use the single sender email you authorised on Postmark!
+  sender_email: "something@gmail.com"
   
 ```
 
@@ -57,6 +67,7 @@ curl -v http://127.0.0.1:8000/health_check
 ```
 
 ##### 可以创建 .dockerignore 来忽略下面的文件
+
 ```
 .env
 target/
