@@ -25,6 +25,7 @@ touch local.yaml
 
 application:
   host: 127.0.0.1
+  base_url: "http://127.0.0.1"
 database:
   require_ssl: false
   

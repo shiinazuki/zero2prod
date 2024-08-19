@@ -38,7 +38,12 @@ impl Application {
 
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let port = listener.local_addr().unwrap().port();
-        let server = run(listener, connection_pool.await, email_client).await?;
+        let server = run(
+            listener,
+            connection_pool.await,
+            email_client,
+            configuration.application.base_url,
+        )?;
 
         // 我们将绑定的端口“保存”在 `Application` 的一个字段中
         Ok(Self { port, server })
@@ -64,17 +69,24 @@ pub async fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
     // .connect_lazy_with(configuration.with_db())
 }
 
+// 我们需要定义一个包装器类型，以便在 `subscribe` 处理程序中检索 URL
+// 在 actix-web 中，从上下文中检索是基于类型的：使用
+// 原始 `String` 会让我们面临冲突。
+pub struct ApplicationBaseUrl(pub String);
+
 // 注意不同的签名！
 // 我们在快乐路径上返回 `Server`，并且删除了 `async` 关键字
 // 我们没有 .await 调用，因此不再需要它。
-pub async  fn run(
+fn run(
     listener: TcpListener,
     db_pool: PgPool,
     email_client: EmailClient,
+    base_url: String,
 ) -> Result<Server, std::io::Error> {
     // 将连接包装在智能指针中
     let db_pool = web::Data::new(db_pool);
     let email_client = Data::new(email_client);
+    let base_url = Data::new(ApplicationBaseUrl(base_url));
 
     let server = HttpServer::new(move || {
         App::new()
@@ -83,13 +95,14 @@ pub async  fn run(
             .route("/health_check", web::get().to(health_check))
             // 我们的路由表中为 POST /subscribe 请求添加一个新条目
             .route("/subscriptions", web::post().to(subscribe))
+            .route("/subscriptions/confirm", web::get().to(confirm))
             // 将数据库连接注册为应用程序状态的一部分
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
+            .app_data(base_url.clone())
     })
     .listen(listener)?
     .run();
 
-    // No .await here!
     Ok(server)
 }
