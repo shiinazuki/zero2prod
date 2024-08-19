@@ -74,6 +74,8 @@ pub async fn subscribe(
     HttpResponse::Ok().finish()
 }
 
+
+// TODO 该方法后续自己优化
 #[tracing::instrument(
     name = "Send a confirmation email to a new subscriber",
     skip(email_client, new_subscriber, base_url, subscription_token)
@@ -89,10 +91,10 @@ pub async fn send_confirmation_email(
         base_url, subscription_token,
     );
 
-    let plain_body = format!(
-        "Welcome to our newsletter!\nVisit {} to confirm your subscription.",
-        confirmation_link
-    );
+    // let plain_body = format!(
+    //     "Welcome to our newsletter!\nVisit {} to confirm your subscription.",
+    //     confirmation_link
+    // );
 
     let html_body = format!(
         "Welcome to our newsletter!<br />\
@@ -103,7 +105,7 @@ pub async fn send_confirmation_email(
     // 向新订阅者发送一封（无用的）电子邮件
     // 我们暂时忽略电子邮件传递错误
     email_client
-        .send_email(new_subscriber.email, "Welcome!", &html_body, &plain_body)
+        .send_email(new_subscriber.email, "Welcome!", &html_body, &"outbound")
         .await
 }
 
