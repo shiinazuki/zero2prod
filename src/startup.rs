@@ -96,6 +96,7 @@ fn run(
             // 我们的路由表中为 POST /subscribe 请求添加一个新条目
             .route("/subscriptions", web::post().to(subscribe))
             .route("/subscriptions/confirm", web::get().to(confirm))
+            .route("/newsletters", web::post().to(publish_newsletter))
             // 将数据库连接注册为应用程序状态的一部分
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
