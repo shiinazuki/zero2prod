@@ -9,6 +9,7 @@ touch base.yaml
 
 application:
   port: 8000
+    hmac_secret: "xxxxxxx"
 database:
   host: your host
   port: your port

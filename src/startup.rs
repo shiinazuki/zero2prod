@@ -1,10 +1,13 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::route::*;
+use actix_web::cookie::Key;
 use actix_web::dev::Server;
 use actix_web::web::Data;
 use actix_web::{web, App, HttpServer};
-use secrecy::ExposeSecret;
+use actix_web_flash_messages::storage::CookieMessageStore;
+use actix_web_flash_messages::FlashMessagesFramework;
+use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 use std::net::TcpListener;
 use tracing_actix_web::TracingLogger;
@@ -43,6 +46,7 @@ impl Application {
             connection_pool.await,
             email_client,
             configuration.application.base_url,
+            configuration.application.hmac_secret,
         )?;
 
         // 我们将绑定的端口“保存”在 `Application` 的一个字段中
@@ -82,14 +86,19 @@ fn run(
     db_pool: PgPool,
     email_client: EmailClient,
     base_url: String,
+    hmac_secret: Secret<String>,
 ) -> Result<Server, std::io::Error> {
     // 将连接包装在智能指针中
     let db_pool = web::Data::new(db_pool);
     let email_client = Data::new(email_client);
     let base_url = Data::new(ApplicationBaseUrl(base_url));
 
+    let message_store =
+        CookieMessageStore::builder(Key::from(hmac_secret.expose_secret().as_bytes())).build();
+    let message_framework = FlashMessagesFramework::builder(message_store).build();
     let server = HttpServer::new(move || {
         App::new()
+            .wrap(message_framework.clone())
             // 使用 `App` 上的 `wrap` 方法添加 logger 中间件
             .wrap(TracingLogger::default())
             .route("/health_check", web::get().to(health_check))
@@ -97,13 +106,23 @@ fn run(
             .route("/subscriptions", web::post().to(subscribe))
             .route("/subscriptions/confirm", web::get().to(confirm))
             .route("/newsletters", web::post().to(publish_newsletter))
+            .route("/", web::get().to(home))
+            .route("/login", web::get().to(login_from))
+            .route("/login", web::post().to(login))
             // 将数据库连接注册为应用程序状态的一部分
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
             .app_data(base_url.clone())
+            .app_data(Data::new(HmacSecret(hmac_secret.clone())))
     })
     .listen(listener)?
     .run();
 
     Ok(server)
 }
+
+// 让我们创建一个包装器类型来规避
+// 另一个中间件或服务在应用程序状态中注册
+// 另一个 Secret<String>，覆盖我们的 HMAC 密钥
+#[derive(Clone)]
+pub struct HmacSecret(pub Secret<String>);
