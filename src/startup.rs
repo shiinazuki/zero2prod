@@ -1,6 +1,8 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::route::*;
+use actix_session::storage::RedisSessionStore;
+use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
 use actix_web::dev::Server;
 use actix_web::web::Data;
@@ -20,7 +22,7 @@ pub struct Application {
 
 impl Application {
     // 我们已经将 `build` 函数转换为 `Application` 的构造函数
-    pub async fn build(configuration: Settings) -> Result<Self, std::io::Error> {
+    pub async fn build(configuration: Settings) -> Result<Self,anyhow::Error> {
         // 拿到pgsql的连接
         let connection_pool = get_connection_pool(&configuration.database);
 
@@ -47,7 +49,9 @@ impl Application {
             email_client,
             configuration.application.base_url,
             configuration.application.hmac_secret,
-        )?;
+            configuration.redis_uri,
+        )
+        .await?;
 
         // 我们将绑定的端口“保存”在 `Application` 的一个字段中
         Ok(Self { port, server })
@@ -81,24 +85,30 @@ pub struct ApplicationBaseUrl(pub String);
 // 注意不同的签名！
 // 我们在快乐路径上返回 `Server`，并且删除了 `async` 关键字
 // 我们没有 .await 调用，因此不再需要它。
-fn run(
+async fn run(
     listener: TcpListener,
     db_pool: PgPool,
     email_client: EmailClient,
     base_url: String,
     hmac_secret: Secret<String>,
-) -> Result<Server, std::io::Error> {
+    redis_uri: Secret<String>,
+) -> Result<Server, anyhow::Error> {
     // 将连接包装在智能指针中
     let db_pool = web::Data::new(db_pool);
     let email_client = Data::new(email_client);
     let base_url = Data::new(ApplicationBaseUrl(base_url));
 
-    let message_store =
-        CookieMessageStore::builder(Key::from(hmac_secret.expose_secret().as_bytes())).build();
+    let secret_key = Key::from(hmac_secret.expose_secret().as_bytes());
+    let message_store = CookieMessageStore::builder(secret_key.clone()).build();
     let message_framework = FlashMessagesFramework::builder(message_store).build();
+    let redis_store = RedisSessionStore::new(redis_uri.expose_secret()).await?;
     let server = HttpServer::new(move || {
         App::new()
             .wrap(message_framework.clone())
+            .wrap(SessionMiddleware::new(
+                redis_store.clone(),
+                secret_key.clone(),
+            ))
             // 使用 `App` 上的 `wrap` 方法添加 logger 中间件
             .wrap(TracingLogger::default())
             .route("/health_check", web::get().to(health_check))
@@ -109,6 +119,9 @@ fn run(
             .route("/", web::get().to(home))
             .route("/login", web::get().to(login_from))
             .route("/login", web::post().to(login))
+            .route("/admin/dashboard", web::get().to(admin_dashboard))
+            .route("/admin/password", web::get().to(change_password_form))
+            .route("/admin/password", web::post().to(change_password))
             // 将数据库连接注册为应用程序状态的一部分
             .app_data(db_pool.clone())
             .app_data(email_client.clone())

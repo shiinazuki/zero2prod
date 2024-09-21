@@ -117,6 +117,41 @@ impl TestApp {
             .await
             .unwrap()
     }
+
+    pub async fn get_admin_dashboard(&self) -> String {
+        self.api_client
+            .get(&format!("{}/admin/dashboard", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+            .text()
+            .await
+            .unwrap()
+    }
+
+    pub async fn get_change_password(&self) -> reqwest::Response {
+        self.api_client
+            .get(&format!("{}/admin/password", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn post_change_password<T>(&self, body: &T) -> reqwest::Response
+    where
+        T: serde::Serialize,
+    {
+        self.api_client
+            .post(&format!("{}/admin/password", &self.address))
+            .form(body)
+            .send()
+            .await
+            .expect("failed to execute request.")
+    }
+
+    pub async fn get_change_password_html(&self) -> String {
+        self.get_change_password().await.text().await.unwrap()
+    }
 }
 // 小辅助函数 - 我们将在本章和下一章中多次进行此检查
 pub fn assert_is_redirect_to(response: &reqwest::Response, location: &str) {
@@ -136,6 +171,8 @@ impl TestUser {
             user_id: Uuid::new_v4(),
             username: Uuid::new_v4().to_string(),
             password: Uuid::new_v4().to_string(),
+            // username: "admin".to_string(),
+            // password: "everythinghastostartsomewhere".to_string(),
         }
     }
 
@@ -149,6 +186,8 @@ impl TestUser {
         .hash_password(self.password.as_bytes(), &salt)
         .unwrap()
         .to_string();
+
+        dbg!(&password_hash);
 
         sqlx::query!(
             "INSERT INTO users (user_id, username, password_hash)
