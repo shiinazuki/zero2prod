@@ -122,6 +122,7 @@ async fn run(
             .route("/admin/dashboard", web::get().to(admin_dashboard))
             .route("/admin/password", web::get().to(change_password_form))
             .route("/admin/password", web::post().to(change_password))
+            .route("/admin/logout", web::post().to(log_out))
             // 将数据库连接注册为应用程序状态的一部分
             .app_data(db_pool.clone())
             .app_data(email_client.clone())

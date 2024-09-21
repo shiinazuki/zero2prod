@@ -9,9 +9,9 @@ pub async fn change_password_form(
     session: TypedSession,
     flash_message: IncomingFlashMessages,
 ) -> Result<HttpResponse, actix_web::Error> {
-    // if session.get_user_id().map_err(e500)?.is_none() {
-    //     return Ok(see_other("/login"));
-    // };
+    if session.get_user_id().map_err(e500)?.is_none() {
+        return Ok(see_other("/login"));
+    };
 
     let mut msg_html = String::new();
     for m in flash_message.iter() {

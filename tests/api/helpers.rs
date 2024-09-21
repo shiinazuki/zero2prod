@@ -106,7 +106,7 @@ impl TestApp {
     }
 
     // 测试只会查看 HTML 页面，因此
-    // 不会公开底层 reqwest::Response
+    // 不会公开底层 request::Response
     pub async fn get_login_html(&self) -> String {
         self.api_client
             .get(&format!("{}/login", &self.address))
@@ -118,15 +118,16 @@ impl TestApp {
             .unwrap()
     }
 
-    pub async fn get_admin_dashboard(&self) -> String {
+    pub async fn get_admin_dashboard(&self) -> reqwest::Response {
         self.api_client
             .get(&format!("{}/admin/dashboard", &self.address))
             .send()
             .await
             .expect("Failed to execute request.")
-            .text()
-            .await
-            .unwrap()
+    }
+
+    pub async fn get_admin_dashboard_html(&self) -> String {
+        self.get_admin_dashboard().await.text().await.unwrap()
     }
 
     pub async fn get_change_password(&self) -> reqwest::Response {
@@ -151,6 +152,14 @@ impl TestApp {
 
     pub async fn get_change_password_html(&self) -> String {
         self.get_change_password().await.text().await.unwrap()
+    }
+
+    pub async fn post_logout(&self) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/admin/logout", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request.")
     }
 }
 // 小辅助函数 - 我们将在本章和下一章中多次进行此检查

@@ -25,6 +25,10 @@ impl TypedSession {
             .get(Self::USER_ID_KEY)
             .map_err(|e| serde_json::Error::custom(format!("Session get error: {}", e)))
     }
+
+    pub fn log_out(self) {
+        self.0.purge()
+    }
 }
 
 impl FromRequest for TypedSession {
