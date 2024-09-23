@@ -1,3 +1,4 @@
+use crate::authentication::reject_anonymous_users;
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::route::*;
@@ -9,10 +10,12 @@ use actix_web::web::Data;
 use actix_web::{web, App, HttpServer};
 use actix_web_flash_messages::storage::CookieMessageStore;
 use actix_web_flash_messages::FlashMessagesFramework;
+use actix_web_lab::middleware::from_fn;
 use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 use std::net::TcpListener;
 use tracing_actix_web::TracingLogger;
+use crate::route;
 
 // 新类型，用于保存新建的服务器及其端口
 pub struct Application {
@@ -22,7 +25,7 @@ pub struct Application {
 
 impl Application {
     // 我们已经将 `build` 函数转换为 `Application` 的构造函数
-    pub async fn build(configuration: Settings) -> Result<Self,anyhow::Error> {
+    pub async fn build(configuration: Settings) -> Result<Self, anyhow::Error> {
         // 拿到pgsql的连接
         let connection_pool = get_connection_pool(&configuration.database);
 
@@ -102,6 +105,7 @@ async fn run(
     let message_store = CookieMessageStore::builder(secret_key.clone()).build();
     let message_framework = FlashMessagesFramework::builder(message_store).build();
     let redis_store = RedisSessionStore::new(redis_uri.expose_secret()).await?;
+
     let server = HttpServer::new(move || {
         App::new()
             .wrap(message_framework.clone())
@@ -111,18 +115,25 @@ async fn run(
             ))
             // 使用 `App` 上的 `wrap` 方法添加 logger 中间件
             .wrap(TracingLogger::default())
+            .route("/", web::get().to(home))
+            .service(
+                web::scope("/admin")
+                    .wrap(from_fn(reject_anonymous_users))
+                    .route("/dashboard", web::get().to(admin_dashboard))
+                    .route("/newsletters", web::get().to(publish_newsletter_form))
+                    .route("/newsletters", web::post().to(newsletter::publish_newsletter))
+                    .route("/password", web::get().to(change_password_form))
+                    .route("/password", web::post().to(change_password))
+                    .route("/logout", web::post().to(log_out)),
+            )
+            .route("/login", web::get().to(login_from))
+            .route("/login", web::post().to(login))
             .route("/health_check", web::get().to(health_check))
             // 我们的路由表中为 POST /subscribe 请求添加一个新条目
             .route("/subscriptions", web::post().to(subscribe))
             .route("/subscriptions/confirm", web::get().to(confirm))
-            .route("/newsletters", web::post().to(publish_newsletter))
-            .route("/", web::get().to(home))
-            .route("/login", web::get().to(login_from))
-            .route("/login", web::post().to(login))
-            .route("/admin/dashboard", web::get().to(admin_dashboard))
-            .route("/admin/password", web::get().to(change_password_form))
-            .route("/admin/password", web::post().to(change_password))
-            .route("/admin/logout", web::post().to(log_out))
+            .route("/newsletters", web::post().to(newsletters::publish_newsletter))
+
             // 将数据库连接注册为应用程序状态的一部分
             .app_data(db_pool.clone())
             .app_data(email_client.clone())

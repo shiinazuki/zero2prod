@@ -32,7 +32,7 @@ impl EmailClient {
         recipient: &SubscriberEmail,
         subject: &str,
         html_content: &str,
-        text_content: &str,
+        message_stream: &str,
     ) -> Result<(), reqwest::Error> {
         let url = format!("{}/email", self.base_url);
         let request_body = SendEmailRequest {
@@ -40,7 +40,7 @@ impl EmailClient {
             to: recipient.as_ref(),
             subject,
             html_body: html_content,
-            message_stream: text_content,
+            message_stream,
         };
         let _builder = self
             .http_client
