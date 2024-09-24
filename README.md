@@ -21,33 +21,7 @@ email_client:
   sender_email: "test@gmail.com"
   authorization_token: "my-secret-token"
   timeout_milliseconds: 10000
-
-touch local.yaml
-
-application:
-  host: 127.0.0.1
-  base_url: "http://127.0.0.1"
-database:
-  require_ssl: false
-  
-touch dev.yaml
-
-application:
-  host: 127.0.0.1
-database:
-  require_ssl: false
-  
-touch production.yaml
-
-application:
-  host: 0.0.0.0
-database:
-  require_ssl: true
-email_client:
-# Value retrieved from Postmark's API documentation
-  base_url: "https://api.postmarkapp.com"
-# Use the single sender email you authorised on Postmark!
-  sender_email: "something@gmail.com"
+redis_uri: "redis://127.0.0.1:6379"
   
 ```
 
