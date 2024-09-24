@@ -4,6 +4,7 @@ use serde_aux::prelude::deserialize_number_from_string;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use sqlx::ConnectOptions;
 use std::time::Duration;
+use crate::email_client::EmailClient;
 
 #[derive(Clone, serde::Deserialize)]
 pub struct Settings {
@@ -31,6 +32,18 @@ pub struct EmailClientSettings {
 }
 
 impl EmailClientSettings {
+    pub fn client(self) -> EmailClient {
+        let sender_email = self.sender().expect("Invalid sender email address.");
+        let timeout = self.timeout();
+        EmailClient::new(
+            self.base_url,
+            sender_email,
+            self.authorization_token,
+            timeout,
+        )
+    }
+    //
+
     pub fn timeout(&self) -> Duration {
         Duration::from_millis(self.timeout_milliseconds)
     }

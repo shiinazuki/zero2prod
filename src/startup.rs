@@ -15,7 +15,6 @@ use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 use std::net::TcpListener;
 use tracing_actix_web::TracingLogger;
-use crate::route;
 
 // 新类型，用于保存新建的服务器及其端口
 pub struct Application {
